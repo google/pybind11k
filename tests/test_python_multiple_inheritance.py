@@ -34,6 +34,28 @@ class PCExplicitInitMissingSuperB0(m.CppBase0):
         del value
 
 
+class PPPCCC0(PPCC0, m.CppDrvdB0):
+    pass
+
+
+class PC10(m.CppDrvd0):
+    pass
+
+
+class PC20(m.CppDrvdB0):
+    pass
+
+
+class PCD0(PC10, PC20):
+    pass
+
+
+class PCDI0(PC10, PC20):
+    def __init__(self):
+        PC10.__init__(self, 11)
+        PC20.__init__(self, 12)
+
+
 #
 # Using py::metaclass((PyObject *) &PyType_Type) (used with py::class_<> for CppBase1, CppDrvd1):
 # COPY-PASTE block from above, replace 0 with 1:
@@ -61,6 +83,28 @@ class PCExplicitInitMissingSuper1(m.CppBase1):
 class PCExplicitInitMissingSuperB1(m.CppBase1):
     def __init__(self, value):
         del value
+
+
+class PPPCCC1(PPCC1, m.CppDrvdB1):
+    pass
+
+
+class PC11(m.CppDrvd1):
+    pass
+
+
+class PC21(m.CppDrvdB1):
+    pass
+
+
+class PCD1(PC11, PC21):
+    pass
+
+
+class PCDI1(PC11, PC21):
+    def __init__(self):
+        PC11.__init__(self, 11)
+        PC21.__init__(self, 12)
 
 
 @pytest.mark.parametrize(("pc_type"), [PC0, PC1])
@@ -137,3 +181,46 @@ def test_derived_tp_init_registry_weakref_based_cleanup():
     for _ in range(100):
         assert nested_function(0) == (10, 11)
         assert nested_function(3) == (13, 14)
+
+
+def NOtest_PPPCCC0():
+    # terminate called after throwing an instance of 'pybind11::error_already_set'
+    # what():  TypeError: bases include diverging derived types:
+    #     base=pybind11_tests.python_multiple_inheritance.CppBase0,
+    #     derived1=pybind11_tests.python_multiple_inheritance.CppDrvd0,
+    #     derived2=pybind11_tests.python_multiple_inheritance.CppDrvdB0
+    PPPCCC0(11)
+
+
+def NOtest_PPPCCC1():
+    # terminate called after throwing an instance of 'pybind11::error_already_set'
+    # what():  TypeError: bases include diverging derived types:
+    #     base=pybind11_tests.python_multiple_inheritance.CppBase1,
+    #     derived1=pybind11_tests.python_multiple_inheritance.CppDrvd1,
+    #     derived2=pybind11_tests.python_multiple_inheritance.CppDrvdB1
+    PPPCCC1(11)
+
+
+@pytest.mark.parametrize(
+    ("pcd_type", "cppdrvdb"), [(PCD0, "CppDrvdB0"), (PCD1, "CppDrvdB1")]
+)
+def test_PCD(pcd_type, cppdrvdb):
+    if m.if_defined_PYBIND11_INIT_SAFETY_CHECKS_VIA_DEFAULT_PYBIND11_METACLASS:
+        pytest.skip(
+            "PYBIND11_INIT_SAFETY_CHECKS_VIA_DEFAULT_PYBIND11_METACLASS is defined"
+        )
+    # This escapes all_type_info_check_for_divergence() because CppBase does not appear in bases.
+    with pytest.raises(
+        TypeError,
+        match=cppdrvdb + r"\.__init__\(\) must be called when overriding __init__$",
+    ):
+        pcd_type(11)
+
+
+@pytest.mark.parametrize(
+    ("pcdi_type", "pass_fn"), [(PCDI0, m.pass_CppBase0), (PCDI1, m.pass_CppBase1)]
+)
+def test_PCDI(pcdi_type, pass_fn):
+    obj = pcdi_type()
+    with pytest.raises(TypeError, match="^bases include diverging derived types: "):
+        pass_fn(obj)
